@@ -1,21 +1,18 @@
 import telebot
 from telebot import types
 from flask import Flask, request
-import os
 
 TOKEN = "8199761005:AAGy_LSo96NrrLeyox6jWjbwKHU26KS5Vy0"
 ADMIN_ID = 2109635883
-APP_URL = "https://telegram-vote-bot-q091.onrender.com/" + TOKEN
+WEBHOOK_URL = "https://telegram-vote-bot-q091.onrender.com"  # Render URL
 
 bot = telebot.TeleBot(TOKEN)
 server = Flask(__name__)
 
-# Ma'lumotlar
 user_data = {}
 users = set()
 vote_link = "https://t.me/boost/RAKHIMOV_SAVDO"
 
-# Start
 @bot.message_handler(commands=['start'])
 def start(message):
     users.add(message.chat.id)
@@ -29,16 +26,14 @@ def start(message):
         reply_markup=markup
     )
 
-# Ovoz berish bosqichi
 @bot.message_handler(func=lambda m: m.text == "🗳 Ovoz bering")
 def vote(message):
     text = (
         "📌 *Ovoz berish jarayoni:*\n\n"
-        "1️⃣ *Quyidagi havolaga kiring va ovoz bering:*\n"
-        f"🔗 [{vote_link}]({vote_link})\n\n"
-        "2️⃣ *Ovoz berganingizdan so‘ng, ovoz bergan telefon raqamingizni yuboring.*\n\n"
-        "3️⃣ *O‘sha raqam bilan berilgan ovozni tasdiqlovchi screenshot yuboring.* 📷\n\n"
-        "✅ Shundan keyin sizga *karta raqam* yuboramiz."
+        f"1️⃣ Quyidagi havolaga kiring va ovoz bering:\n🔗 [{vote_link}]({vote_link})\n\n"
+        "2️⃣ Ovoz berganingizdan so‘ng, ovoz bergan telefon raqamingizni yuboring.\n\n"
+        "3️⃣ O‘sha raqam bilan berilgan ovozni tasdiqlovchi screenshot yuboring.\n\n"
+        "✅ Shundan keyin sizga karta raqam yuboramiz."
     )
     bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
     msg = bot.send_message(message.chat.id, "📱 *Telefon raqamingizni kiriting:*", parse_mode="Markdown")
@@ -73,16 +68,17 @@ def save_card(message):
     markup.add(types.InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"approve_{message.chat.id}"))
     markup.add(types.InlineKeyboardButton("❌ Rad etish", callback_data=f"reject_{message.chat.id}"))
     bot.send_message(ADMIN_ID, "🛠 Foydalanuvchini tasdiqlaysizmi?", reply_markup=markup)
-    bot.send_message(message.chat.id, "📌 Ma’lumotlaringiz tekshiruvda...")
+    
+    # Siz so‘ragan qo‘shimcha xabar
+    bot.send_message(message.chat.id, "⏳ *Sizning so‘rovingiz 1 soat ichida qabul qilinadi.*", parse_mode="Markdown")
 
-# Admin panel
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
     if message.chat.id != ADMIN_ID:
         return
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("👥 Foydalanuvchilar", "🔗 Linkni o‘zgartirish")
-    markup.add("✏ Matn o‘zgartirish", "⬅ Chiqish")
+    markup.add("⬅ Chiqish")
     bot.send_message(message.chat.id, "🛠 *Admin paneliga xush kelibsiz!*", parse_mode="Markdown", reply_markup=markup)
 
 @bot.message_handler(func=lambda m: m.text == "👥 Foydalanuvchilar" and m.chat.id == ADMIN_ID)
@@ -99,7 +95,6 @@ def set_new_link(message):
     vote_link = message.text
     bot.send_message(ADMIN_ID, f"✅ Havola yangilandi:\n{vote_link}")
 
-# Admin tasdiqlash
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("approve_", "reject_")))
 def admin_action(call):
     if call.from_user.id != ADMIN_ID:
@@ -112,19 +107,15 @@ def admin_action(call):
         bot.send_message(user_id, "❌ *So‘rovingiz rad etildi.*", parse_mode="Markdown")
         bot.send_message(ADMIN_ID, f"🚫 Foydalanuvchi {user_id} rad etildi.")
 
-# Flask server
 @server.route('/' + TOKEN, methods=['POST'])
 def getMessage():
     json_str = request.get_data().decode('UTF-8')
     update = telebot.types.Update.de_json(json_str)
     bot.process_new_updates([update])
-    return "!", 200
+    return "OK", 200
 
 @server.route("/")
 def webhook():
     bot.remove_webhook()
-    bot.set_webhook(url=APP_URL)
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
     return "Webhook set", 200
-
-if __name__ == "__main__":
-    server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
